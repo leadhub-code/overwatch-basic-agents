@@ -8,26 +8,29 @@ logger = logging.getLogger(__name__)
 
 class BaseConfiguration:
 
+    top_level_key = None
+
     def __init__(self, cfg_path):
         cfg_path = Path(cfg_path)
         base_path = cfg_path.parent
-        data = yaml.safe_load(cfg_path.read_text())['overwatch_hub']
+        data = yaml.safe_load(cfg_path.read_text())
+        assert self.top_level_key
+        cfg_data = data[self.top_level_key]
+        self._load(cfg_data, base_path)
+
+    def _load(self, data, base_path):
         self.report_url = data['report_url']
         self.report_token = data['report_token']
-        self.report_tokens = set()
         self.log = _Log(data.get('log'), base_path)
+        self.sleep_interval = _float_or_none(data.get('sleep_interval'))
+        self.watchdog_interval = _float_or_none(data.get('watchdog_interval'))
 
 
-class _HTTPInterface:
-
-    def __init__(self, data):
-        self.bind_host = 'localhost'
-        self.bind_port = 8090
-        if data:
-            if data.get('bind_host'):
-                self.bind_host = data['bind_host']
-            if data.get('bind_port'):
-                self.bind_port = int(data['bind_port'])
+def _float_or_none(v):
+    try:
+        return float(v) if v else None
+    except Exception as e:
+        raise Exception('Cannot convert value {!r} to float or None: {!r}'.format(v, e)) from None
 
 
 class _Log:
