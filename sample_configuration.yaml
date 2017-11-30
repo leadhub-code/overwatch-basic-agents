@@ -1,0 +1,17 @@
+_common: &common
+    report_url: http://localhost:8090/report
+    report_token: secret_report_token
+    log:
+      file: local/agent.log
+
+overwatch_basic_agents:
+  <<: *common
+
+overwatch_web_agent:
+  <<: *common
+
+  watch:
+    - url: https://google.com/
+
+    - url: https://d2o4ws9vl9hnlu.cloudfront.net/2017/11/ping.txt
+      response_contains: Pong
