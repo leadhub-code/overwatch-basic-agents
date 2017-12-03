@@ -13,7 +13,8 @@ class BaseConfiguration:
     def __init__(self, cfg_path):
         cfg_path = Path(cfg_path)
         base_path = cfg_path.parent
-        data = yaml.safe_load(cfg_path.read_text())
+        with cfg_path.open() as f:
+            data = yaml.safe_load(f.read())
         assert self.top_level_key
         cfg_data = data[self.top_level_key]
         self._load(cfg_data, base_path)
