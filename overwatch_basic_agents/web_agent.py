@@ -26,6 +26,25 @@ def web_agent_main():
     run_web_agent(conf)
 
 
+class Configuration (BaseConfiguration):
+
+    top_level_key = 'overwatch_web_agent'
+
+    def _load(self, data, base_path):
+        super()._load(data, base_path)
+        if not isinstance(data['watch'], list):
+            raise Exception('Configuration item overwatch_web_agent.watch must be a list')
+        self.watch_targets = [WatchTarget(d) for d in data['watch']]
+
+
+class WatchTarget:
+
+    def __init__(self, data):
+        self.name = data.get('name')
+        self.url = data['url']
+        self.response_contains = data.get('response_contains')
+
+
 def run_web_agent(conf):
     sleep_interval = conf.sleep_interval or default_sleep_interval
     while True:
@@ -98,24 +117,5 @@ def process_target(conf, sleep_interval, rs, target):
         r.raise_for_status()
     except Exception as e:
         logger.error('Failed to post report to %r: %r', conf.report_url, e)
-        logger.info('Report token: %s...%s', conf.report_token[:3], conf.report_token[:-3])
+        logger.info('Report token: %s...%s', conf.report_token[:3], conf.report_token[-3:])
         logger.info('Report data: %r', report_data)
-
-
-class Configuration (BaseConfiguration):
-
-    top_level_key = 'overwatch_web_agent'
-
-    def _load(self, data, base_path):
-        super()._load(data, base_path)
-        if not isinstance(data['watch'], list):
-            raise Exception('Configuration item overwatch_web_agent.watch must be a list')
-        self.watch_targets = [WatchTarget(d) for d in data['watch']]
-
-
-class WatchTarget:
-
-    def __init__(self, data):
-        self.name = data.get('name')
-        self.url = data['url']
-        self.response_contains = data.get('response_contains')
