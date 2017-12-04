@@ -18,4 +18,6 @@ def temp_dir(tmpdir):
 
 @fixture
 def project_dir():
-    return Path(__file__).parent.parent.resolve()
+    d = Path(__file__).parent.parent.resolve()
+    assert (d / 'setup.py').is_file()
+    return d

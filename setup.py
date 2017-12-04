@@ -24,6 +24,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
+            'overwatch-log-agent=overwatch_basic_agents:log_agent_main',
             'overwatch-system-agent=overwatch_basic_agents:system_agent_main',
             'overwatch-web-agent=overwatch_basic_agents:web_agent_main',
         ],

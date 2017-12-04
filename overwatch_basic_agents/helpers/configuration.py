@@ -10,10 +10,10 @@ class BaseConfiguration:
 
     top_level_key = None
 
-    def __init__(self, cfg_path):
-        cfg_path = Path(cfg_path)
-        base_path = cfg_path.parent
-        with cfg_path.open() as f:
+    def __init__(self, conf_file_path):
+        self.conf_file_path = Path(conf_file_path).resolve()
+        base_path = self.conf_file_path.parent
+        with self.conf_file_path.open() as f:
             data = yaml.safe_load(f.read())
         assert self.top_level_key
         cfg_data = data[self.top_level_key]
