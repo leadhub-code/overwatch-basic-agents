@@ -17,6 +17,7 @@ from .helpers import BaseConfiguration, setup_logging, setup_log_file
 logger = logging.getLogger(__name__)
 
 default_sleep_interval = 10
+default_report_timeout = 10
 
 rs = requests.session()
 
@@ -92,7 +93,11 @@ def finish_and_send_report(report_data, conf, sleep_interval, t0):
     }
     report_data['state']['iteration_duration_s'] = monotime() - t0
     try:
-        r = rs.post(conf.report_url, json=report_data, headers={'Authorization': 'token ' + conf.report_token})
+        r = rs.post(
+            conf.report_url,
+            json=report_data,
+            headers={'Authorization': 'token ' + conf.report_token},
+            timeout=default_report_timeout)
         logger.debug('Report response: %s', r.text[:100])
         r.raise_for_status()
     except Exception as e:

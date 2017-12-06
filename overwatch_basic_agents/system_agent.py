@@ -13,6 +13,7 @@ from .helpers import BaseConfiguration, setup_logging, setup_log_file
 logger = logging.getLogger(__name__)
 
 default_sleep_interval = 15
+default_report_timeout = 10
 
 rs = requests.session()
 
@@ -71,7 +72,10 @@ def run_system_agent_iteration(conf, sleep_interval):
     }
 
     try:
-        r = rs.post(conf.report_url, json=report_data, headers={'Authorization': 'token ' + conf.report_token})
+        r = rs.post(conf.report_url,
+            json=report_data,
+            headers={'Authorization': 'token ' + conf.report_token},
+            timeout=default_report_timeout)
         logger.debug('Report response: %s', r.text[:100])
         r.raise_for_status()
     except Exception as e:
