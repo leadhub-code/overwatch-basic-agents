@@ -66,54 +66,21 @@ def run_web_agent_iteration(conf, sleep_interval):
 
 
 def process_target(conf, sleep_interval, rs, target):
-    report_date = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-    report_label = {
-        'agent': 'web',
-        'host': getfqdn(),
-        'target': target.name or target.url,
-    }
-    t0 = monotime()
-    r = rs.get(target.url, timeout=default_timeout)
-    duration = monotime() - t0
-    report_state = {
-        'url': target.url,
-        'final_url': r.url,
-        'response': {
-            'status_code': {
-                '__value': r.status_code,
-                '__check': {
-                    'state': 'green' if r.status_code == 200 else 'red',
-                },
-            },
-            'content_length': len(r.content),
-            'duration': duration,
+    report_data = {
+        'date': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+        'label': {
+            'agent': 'web',
+            'host': getfqdn(),
+            'target': target.name or target.url,
         },
+        'state': {},
     }
-
-    if target.response_contains:
-        present = target.response_contains in r.text
-        report_state['response_contains'] = {
-            'text': target.response_contains,
-            'present': {
-                '__value': present,
-                '__check': {
-                    'state': 'green' if present else 'red',
-                },
-            },
-        }
+    check_target(rs, target, report_data['state'])
 
     # add watchdog
     wd_interval = conf.watchdog_interval or sleep_interval + 30
-    report_state['watchdog'] = {
-        '__watchdog': {
-            'deadline': int((time() + wd_interval) * 1000),
-        },
-    }
-
-    report_data = {
-        'label': report_label,
-        'date': report_date,
-        'state': report_state,
+    report_data['state']['watchdog'] = {
+        '__watchdog': {'deadline': int((time() + wd_interval) * 1000)},
     }
 
     try:
@@ -128,3 +95,53 @@ def process_target(conf, sleep_interval, rs, target):
         logger.error('Failed to post report to %r: %r', conf.report_url, e)
         logger.info('Report token: %s...%s', conf.report_token[:3], conf.report_token[-3:])
         logger.info('Report data: %r', report_data)
+
+
+def check_target(rs, target, report_state, timeout=None):
+    '''
+    parameter timeout is used in tests
+    '''
+    report_state['name'] = target.name
+    report_state['url'] = target.url
+    t0 = monotime()
+    try:
+        try:
+            r = rs.get(target.url,
+                timeout=timeout or default_timeout)
+        finally:
+            duration = monotime() - t0
+            report_state['duration'] = duration
+    except Exception as e:
+        logger.info('Exception while processing url %r: %r', target.url, e)
+        report_state['error'] = {
+            '__value': str(e),
+            '__check': {'state': 'red'},
+        }
+        return
+
+    report_state['error'] = {
+        '__value': None,
+        '__check': {'state': 'green'},
+    }
+    report_state['final_url'] = r.url
+    report_state['response'] = {
+        'status_code': {
+            '__value': r.status_code,
+            '__check': {
+                'state': 'green' if r.status_code == 200 else 'red',
+            },
+        },
+        'content_length': len(r.content),
+    }
+
+    if target.response_contains:
+        present = target.response_contains in r.text
+        report_state['response_contains'] = {
+            'text': target.response_contains,
+            'present': {
+                '__value': present,
+                '__check': {
+                    'state': 'green' if present else 'red',
+                },
+            },
+        }
