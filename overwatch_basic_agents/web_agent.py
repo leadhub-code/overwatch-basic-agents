@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 default_sleep_interval = 30
 default_timeout = 10
 default_report_timeout = 10
+default_user_agent = 'Overwatch Web Agent'
 
 
 def web_agent_main():
@@ -107,6 +108,9 @@ def check_target(rs, target, report_state, timeout=None):
     try:
         try:
             r = rs.get(target.url,
+                headers={
+                    'User-Agent': default_user_agent,
+                },
                 timeout=timeout or default_timeout)
         finally:
             duration = monotime() - t0
