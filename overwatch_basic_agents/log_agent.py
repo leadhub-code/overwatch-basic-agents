@@ -27,11 +27,15 @@ def log_agent_main():
     p.add_argument('--verbose', '-v', action='count')
     p.add_argument('conf_file')
     args = p.parse_args()
-    setup_logging(verbosity=args.verbose)
-    conf = Configuration(args.conf_file)
-    setup_log_file(conf.log.file_path)
-    logger.debug('Log agent starting')
-    run_log_agent(conf)
+    try:
+        setup_logging(verbosity=args.verbose)
+        conf = Configuration(args.conf_file)
+        setup_log_file(conf.log.file_path)
+        logger.debug('Log agent starting')
+        run_log_agent(conf)
+    except BaseException as e:
+        logger.exception('Log agent failed: %r', e)
+        raise e
 
 
 class Configuration (BaseConfiguration):
