@@ -15,4 +15,4 @@ def test_check_nonexisting_target():
     print(report_state)
     assert report_state['name'] == 'Test'
     assert report_state['url'] == 'http://localhost:4/test'
-    assert report_state['duration']
+    assert report_state['duration_seconds']

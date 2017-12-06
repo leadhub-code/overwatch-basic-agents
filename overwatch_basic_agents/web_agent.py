@@ -114,7 +114,7 @@ def check_target(rs, target, report_state, timeout=None):
                 timeout=timeout or default_timeout)
         finally:
             duration = monotime() - t0
-            report_state['duration'] = duration
+            report_state['duration_seconds'] = duration
     except Exception as e:
         logger.info('Exception while processing url %r: %r', target.url, e)
         report_state['error'] = {
