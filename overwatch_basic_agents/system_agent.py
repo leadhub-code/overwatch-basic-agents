@@ -94,17 +94,12 @@ def gather_state(conf):
 def gather_cpu():
     ct = psutil.cpu_times()
     cs = psutil.cpu_stats()
-    return {
+    data = {
         'count': {
             'logical': psutil.cpu_count(logical=True),
             'physical': psutil.cpu_count(logical=False),
         },
-        'times': {
-            'user': ct.user,
-            'system': ct.system,
-            'idle': ct.idle,
-            'iowait': ct.iowait,
-        },
+        'times': {},
         'stats': {
             'ctx_switches': cs.ctx_switches,
             'interrupts': cs.interrupts,
@@ -112,6 +107,12 @@ def gather_cpu():
             'syscalls': cs.syscalls,
         },
     }
+    for k in 'user', 'system', 'idle', 'iowait':
+        try:
+            data['times'][k] = getattr(ct, k)
+        except AttributeError:
+            pass
+    return data
 
 
 def gather_volumes():
