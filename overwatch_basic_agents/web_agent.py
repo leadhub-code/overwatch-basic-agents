@@ -12,6 +12,8 @@ from .helpers import BaseConfiguration, setup_logging, setup_log_file
 logger = logging.getLogger(__name__)
 
 default_sleep_interval = 30
+default_timeout = 10
+default_report_timeout = 10
 
 
 def web_agent_main():
@@ -67,7 +69,7 @@ def process_target(conf, sleep_interval, rs, target):
         'target': target.name or target.url,
     }
     t0 = monotime()
-    r = rs.get(target.url)
+    r = rs.get(target.url, timeout=default_timeout)
     duration = monotime() - t0
     report_state = {
         'url': target.url,
@@ -104,7 +106,6 @@ def process_target(conf, sleep_interval, rs, target):
         },
     }
 
-
     report_data = {
         'label': report_label,
         'date': report_date,
@@ -112,7 +113,11 @@ def process_target(conf, sleep_interval, rs, target):
     }
 
     try:
-        r = rs.post(conf.report_url, json=report_data, headers={'Authorization': 'token ' + conf.report_token})
+        r = rs.post(
+            conf.report_url,
+            json=report_data,
+            headers={'Authorization': 'token ' + conf.report_token},
+            timeout=default_report_timeout)
         logger.debug('Report response: %s', r.text[:100])
         r.raise_for_status()
     except Exception as e:
