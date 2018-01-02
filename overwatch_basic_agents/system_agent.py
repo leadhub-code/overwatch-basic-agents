@@ -121,6 +121,8 @@ def gather_cpu():
 
 
 def gather_volumes():
+    percent_red_threshold = 92
+    free_bytes_red_threshold = 2 * 2**30 # 2 GB
     volumes = {}
     for p in psutil.disk_partitions():
         usage = psutil.disk_usage(p.mountpoint)
@@ -132,11 +134,16 @@ def gather_volumes():
             'usage': {
                 'total_bytes': usage.total,
                 'used_bytes': usage.used,
-                'free_bytes': usage.free,
+                'free_bytes': {
+                    '__value': usage.free,
+                    '__check': {
+                        'state': 'red' if usage.total >= free_bytes_red_threshold * 4 and usage.free < free_bytes_red_threshold else 'green',
+                    },
+                },
                 'percent': {
                     '__value': usage.percent,
                     '__check': {
-                        'state': 'red' if usage.percent > 92 else 'green',
+                        'state': 'red' if usage.percent >= percent_red_threshold else 'green',
                     },
                 }
             },
