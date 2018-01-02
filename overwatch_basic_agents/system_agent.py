@@ -91,6 +91,8 @@ def gather_state(conf):
     return {
         'cpu': gather_cpu(),
         'volumes': gather_volumes(),
+        'memory': gather_memory(),
+        'swap': gather_swap(),
     }
 
 
@@ -140,3 +142,26 @@ def gather_volumes():
             },
         }
     return volumes
+
+
+def gather_memory():
+    mem = psutil.virtual_memory()
+    return {
+        'total_bytes': mem.total,
+        'available_bytes': mem.available,
+    }
+
+
+def gather_swap():
+    sw = psutil.swap_memory()
+    return {
+        'total_bytes': sw.total,
+        'used_bytes': sw.used,
+        'free_bytes': sw.free,
+        'percent': {
+            '__value': sw.percent,
+            '__check': {
+                'state': 'red' if sw.percent > 80 else 'green',
+            },
+        },
+    }
