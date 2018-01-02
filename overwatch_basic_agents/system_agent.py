@@ -133,8 +133,8 @@ def gather_volumes():
                 'free_bytes': usage.free,
                 'percent': {
                     '__value': usage.percent,
-                    '__alarm': {
-                        'state': 'green',
+                    '__check': {
+                        'state': 'red' if usage.percent > 92 else 'green',
                     },
                 }
             },
