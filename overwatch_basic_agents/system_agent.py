@@ -93,7 +93,18 @@ def gather_state(conf):
         'volumes': gather_volumes(),
         'memory': gather_memory(),
         'swap': gather_swap(),
+        'outward_ip': gather_outward_ip(),
     }
+
+
+def gather_outward_ip():
+    try:
+        r = rs.get('https://ip.messa.cz/')
+        r.raise_for_status()
+        return r.text.strip()
+    except Exception as e:
+        logger.exception('Failed to retrieve outward_ip: %r', e)
+        return None
 
 
 def gather_cpu():
