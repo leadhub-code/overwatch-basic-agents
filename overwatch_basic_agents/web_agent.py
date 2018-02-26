@@ -2,9 +2,11 @@ import argparse
 from datetime import datetime
 import logging
 import requests
-from socket import getfqdn
+from socket import AF_INET, getfqdn, socket
+import ssl
 from time import monotonic as monotime
 from time import sleep, time
+from urllib.parse import urlparse
 
 from .helpers import BaseConfiguration, setup_logging, setup_log_file
 
@@ -41,10 +43,10 @@ class Configuration (BaseConfiguration):
         super()._load(data, base_path)
         if not isinstance(data['watch'], list):
             raise Exception('Configuration item overwatch_web_agent.watch must be a list')
-        self.watch_targets = [WatchTarget(d) for d in data['watch']]
+        self.watch_targets = [Target(d) for d in data['watch']]
 
 
-class WatchTarget:
+class Target:
 
     def __init__(self, data):
         self.name = data.get('name')
@@ -104,7 +106,47 @@ def check_target(rs, target, report_state, timeout=None):
     '''
     report_state['name'] = target.name
     report_state['url'] = target.url
-    t0 = monotime()
+
+    # check SSL
+    if target.url.startswith('https://'):
+        p = urlparse(target.url)
+        logger.info('Checking SSL cert of %s:%s', p.hostname, p.port)
+        hostname = p.hostname
+        port = p.port or 443
+        t0 = monotime()
+        cx = ssl.create_default_context()
+        conn = cx.wrap_socket(socket(AF_INET), server_hostname=hostname)
+        conn.settimeout(5)
+        conn.connect((p.hostname, port or 443))
+        try:
+            cert = conn.getpeercert()
+            peer_ip, peer_port = conn.getpeername()
+            logger.debug('Connected to %s (%s) port %s, cert: %r', hostname, peer_ip, port, cert)
+        finally:
+            conn.close()
+        del conn
+        del cx
+        expire_date = datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z')
+        remaining_days = (expire_date - datetime.utcnow()).total_seconds() / 86400
+        report_state['ssl_certificate'] = {
+            'hostname': hostname,
+            'port': port,
+            'ip': peer_ip,
+            'notBefore': cert['notBefore'],
+            'notAfter': cert['notAfter'],
+            'serialNumber': cert['serialNumber'],
+            'remaining_days': {
+                '__value': remaining_days,
+                '__check': {
+                    'state': 'red' if remaining_days < 10 else 'green',
+                },
+            },
+        }
+        duration = monotime() - t0
+        logger.info('SSL check took %.3f s', duration)
+
+    # make HTTP request
+    t1 = monotime()
     try:
         try:
             r = rs.get(target.url,
@@ -113,7 +155,7 @@ def check_target(rs, target, report_state, timeout=None):
                 },
                 timeout=timeout or default_timeout)
         finally:
-            duration = monotime() - t0
+            duration = monotime() - t1
             report_state['duration_seconds'] = duration
     except Exception as e:
         logger.info('Exception while processing url %r: %r', target.url, e)
