@@ -109,41 +109,48 @@ def check_target(rs, target, report_state, timeout=None):
 
     # check SSL
     if target.url.startswith('https://'):
-        p = urlparse(target.url)
-        logger.info('Checking SSL cert of %s:%s', p.hostname, p.port)
-        hostname = p.hostname
-        port = p.port or 443
-        t0 = monotime()
-        cx = ssl.create_default_context()
-        conn = cx.wrap_socket(socket(AF_INET), server_hostname=hostname)
-        conn.settimeout(5)
-        conn.connect((p.hostname, port or 443))
         try:
-            cert = conn.getpeercert()
-            peer_ip, peer_port = conn.getpeername()
-            logger.debug('Connected to %s (%s) port %s, cert: %r', hostname, peer_ip, port, cert)
-        finally:
-            conn.close()
-        del conn
-        del cx
-        expire_date = datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z')
-        remaining_days = (expire_date - datetime.utcnow()).total_seconds() / 86400
-        report_state['ssl_certificate'] = {
-            'hostname': hostname,
-            'port': port,
-            'ip': peer_ip,
-            'notBefore': cert['notBefore'],
-            'notAfter': cert['notAfter'],
-            'serialNumber': cert['serialNumber'],
-            'remaining_days': {
-                '__value': remaining_days,
-                '__check': {
-                    'state': 'red' if remaining_days < 10 else 'green',
+            p = urlparse(target.url)
+            logger.info('Checking SSL cert of %s:%s', p.hostname, p.port)
+            hostname = p.hostname
+            port = p.port or 443
+            t0 = monotime()
+            cx = ssl.create_default_context()
+            conn = cx.wrap_socket(socket(AF_INET), server_hostname=hostname)
+            conn.settimeout(5)
+            conn.connect((p.hostname, port or 443))
+            try:
+                cert = conn.getpeercert()
+                peer_ip, peer_port = conn.getpeername()
+                logger.debug('Connected to %s (%s) port %s, cert: %r', hostname, peer_ip, port, cert)
+            finally:
+                conn.close()
+        except Exception as e:
+            report_state['ssl_certificate'] = {
+                'error': {
+                    '__value': str(e),
+                    '__check': {'state': 'red'},
                 },
-            },
-        }
-        duration = monotime() - t0
-        logger.info('SSL check took %.3f s', duration)
+            }
+        else:
+            duration = monotime() - t0
+            logger.info('SSL check took %.3f s', duration)
+            expire_date = datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z')
+            remaining_days = (expire_date - datetime.utcnow()).total_seconds() / 86400
+            report_state['ssl_certificate'] = {
+                'hostname': hostname,
+                'port': port,
+                'ip': peer_ip,
+                'notBefore': cert['notBefore'],
+                'notAfter': cert['notAfter'],
+                'serialNumber': cert['serialNumber'],
+                'remaining_days': {
+                    '__value': remaining_days,
+                    '__check': {
+                        'state': 'red' if remaining_days < 10 else 'green',
+                    },
+                },
+            }
 
     # make HTTP request
     t1 = monotime()
