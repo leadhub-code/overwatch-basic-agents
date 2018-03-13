@@ -1,8 +1,11 @@
 import argparse
 from datetime import datetime
+from datetime import timedelta
 import logging
+import os
 import psutil
 import requests
+import socket
 from socket import getfqdn
 from time import monotonic as monotime
 from time import time, sleep
@@ -90,22 +93,67 @@ def run_system_agent_iteration(conf, sleep_interval):
 def gather_state(conf):
     return {
         'cpu': gather_cpu(),
+        'load': gather_load(),
+        'uptime': gather_uptime(),
         'volumes': gather_volumes(),
         'memory': gather_memory(),
         'swap': gather_swap(),
-        'outward_ip': gather_outward_ip(),
+        'outward_ip4': gather_outward_ip4(),
+        'outward_ip6': gather_outward_ip6(),
     }
 
 
-def gather_outward_ip():
+def gather_outward_ip4():
     try:
-        r = rs.get('https://ip.messa.cz/')
-        r.raise_for_status()
-        return r.text.strip()
-    except Exception as e:
-        logger.exception('Failed to retrieve outward_ip: %r', e)
+        addrs = socket.getaddrinfo('ip.messa.cz', 80)
+        ipv4_addrs = [addr[4][0] for addr in addrs if addr[0] == socket.AF_INET]
+
+        try:
+            r = rs.get('http://['+ipv4_addrs[0]+']/', headers={'Host': 'ip.messa.cz'})
+            r.raise_for_status()
+            return r.text.strip()
+        except Exception as e:
+            logger.debug('Failed to retrieve outward_ip from %s because of: %r', ipv4_addrs[0], e)
+    except socket.gaierror:
+        logger.exception('Failed to resolve A record for ip.messa.cz')
         return None
 
+
+
+def gather_outward_ip6():
+    try:
+        addrs = socket.getaddrinfo('ip.messa.cz', 80)
+        ipv6_addrs = [addr[4][0] for addr in addrs if addr[0] == socket.AF_INET6]
+
+        try:
+            r = rs.get('http://['+ipv6_addrs[0]+']/', headers={'Host': 'ip.messa.cz'})
+            r.raise_for_status()
+            return r.text.strip()
+        except Exception as e:
+            logger.debug('Failed to retrieve outward_ip from %s because of: %r', ipv6_addrs[0], e)
+    except socket.gaierror:
+        logger.exception('Failed to resolve AAAA record for ip.messa.cz')
+        return None
+
+
+def gather_load():
+    data = {
+        '01m': round(os.getloadavg()[0], 2),
+        '05m': round(os.getloadavg()[1], 2),
+        '15m': round(os.getloadavg()[2], 2)
+    }
+    return data
+
+
+def gather_uptime():
+    with open('/proc/uptime', 'r') as f:
+        uptime_seconds = float(f.readline().split()[0])
+        uptime_string = str(timedelta(seconds = uptime_seconds))
+    data = {
+        'seconds': round(uptime_seconds, 0),
+        'string': uptime_string
+    }
+    return data
 
 def gather_cpu():
     ct = psutil.cpu_times()
