@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+from multiprocessing import Process
 import logging
 import requests
 from socket import AF_INET, getfqdn, socket
@@ -63,9 +64,15 @@ def run_web_agent(conf):
 
 def run_web_agent_iteration(conf, sleep_interval):
     rs = requests.session()
+    procs = []
     for n, target in enumerate(conf.watch_targets, start=1):
         logger.info('Processing target %d/%d: %s', n, len(conf.watch_targets), target.url)
-        process_target(conf, sleep_interval, rs, target)
+        p = Process(target=process_target, args=(conf, sleep_interval, rs, target, ))
+        p.start()
+        procs.append(p)
+       #process_target(conf, sleep_interval, rs, target)
+#    for p in procs:
+#        p.join()
 
 
 def process_target(conf, sleep_interval, rs, target):
