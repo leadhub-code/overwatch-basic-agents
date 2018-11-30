@@ -5,7 +5,6 @@ import logging
 import os
 import psutil
 import requests
-import socket
 from socket import getfqdn
 from time import monotonic as monotime
 from time import time, sleep
@@ -105,34 +104,22 @@ def gather_state(conf):
 
 def gather_outward_ip4():
     try:
-        addrs = socket.getaddrinfo('ip.messa.cz', 80)
-        ipv4_addrs = [addr[4][0] for addr in addrs if addr[0] == socket.AF_INET]
-
-        try:
-            r = rs.get('http://['+ipv4_addrs[0]+']/', headers={'Host': 'ip.messa.cz'})
-            r.raise_for_status()
-            return r.text.strip()
-        except Exception as e:
-            logger.debug('Failed to retrieve outward_ip from %s because of: %r', ipv4_addrs[0], e)
-    except socket.gaierror:
-        logger.exception('Failed to resolve A record for ip.messa.cz')
+        r = rs.get('https://ip4.messa.cz/')
+        r.raise_for_status()
+        return r.text.strip()
+    except Exception as e:
+        logger.warning('Failed to retrieve outward_ip4: %r', e)
         return None
-
 
 
 def gather_outward_ip6():
     try:
-        addrs = socket.getaddrinfo('ip.messa.cz', 80)
-        ipv6_addrs = [addr[4][0] for addr in addrs if addr[0] == socket.AF_INET6]
-
-        try:
-            r = rs.get('http://['+ipv6_addrs[0]+']/', headers={'Host': 'ip.messa.cz'})
-            r.raise_for_status()
-            return r.text.strip()
-        except Exception as e:
-            logger.debug('Failed to retrieve outward_ip from %s because of: %r', ipv6_addrs[0], e)
-    except socket.gaierror:
-        logger.exception('Failed to resolve AAAA record for ip.messa.cz')
+        r = rs.get('https://ip6.messa.cz/')
+        r.raise_for_status()
+        return r.text.strip()
+    except Exception as e:
+        # log as just info, because some hosts have IPv6 not configured
+        logger.info('Failed to retrieve outward_ip6: %r', e)
         return None
 
 
