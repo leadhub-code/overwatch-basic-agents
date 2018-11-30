@@ -133,14 +133,19 @@ def gather_load():
 
 
 def gather_uptime():
-    with open('/proc/uptime', 'r') as f:
-        uptime_seconds = float(f.readline().split()[0])
-        uptime_string = str(timedelta(seconds = uptime_seconds))
+    try:
+        with open('/proc/uptime', 'r') as f:
+            uptime_seconds = float(f.readline().split()[0])
+            uptime_string = str(timedelta(seconds = uptime_seconds))
+    except FileNotFoundError as e:
+        logger.debug('Cannot determine uptime: %s', e)
+        return None
     data = {
         'seconds': round(uptime_seconds, 0),
         'string': uptime_string
     }
     return data
+
 
 def gather_cpu():
     ct = psutil.cpu_times()
