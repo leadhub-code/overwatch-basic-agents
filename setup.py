@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='overwatch-basic-agents',
-    version='0.0.3',
+    version='0.0.4',
     author='Petr Messner',
     author_email='petr.messner@gmail.com',
     license='MIT',
