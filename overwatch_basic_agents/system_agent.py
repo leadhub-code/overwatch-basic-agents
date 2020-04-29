@@ -102,6 +102,23 @@ def gather_state(conf):
     return state
 
 
+def value(value, counter=None, unit=None, check_state=None):
+    '''
+    Helper function to generate the report value metadata fragment.
+    '''
+    data = {
+        '__value': value,
+    }
+    if counter:
+        data['__counter'] = True
+    if unit:
+        data['__unit'] = unit
+    if check_state:
+        data.setdefault('__check', {})
+        data['__check']['state'] = check_state
+    return data
+
+
 def gather_outward_ip4():
     try:
         r = rs.get('https://ip4.messa.cz/', timeout=10)
@@ -140,7 +157,7 @@ def gather_uptime():
         logger.debug('Cannot determine uptime: %s', e)
         return None
     data = OrderedDict()
-    data['seconds'] = round(uptime_seconds, 0)
+    data['seconds'] = value(round(uptime_seconds, 0), unit='seconds')
     data['string'] = uptime_string
     return data
 
@@ -154,13 +171,13 @@ def gather_cpu():
     data['count']['physical'] = psutil.cpu_count(logical=False)
     data['times'] = OrderedDict()
     data['stats'] = OrderedDict()
-    data['stats']['ctx_switches'] = cs.ctx_switches
-    data['stats']['interrupts'] = cs.interrupts
-    data['stats']['soft_interrupts'] = cs.soft_interrupts
-    data['stats']['syscalls'] = cs.syscalls
+    data['stats']['ctx_switches'] = value(cs.ctx_switches, counter=True)
+    data['stats']['interrupts'] = value(cs.interrupts, counter=True)
+    data['stats']['soft_interrupts'] = value(cs.soft_interrupts, counter=True)
+    data['stats']['syscalls'] = value(cs.syscalls, counter=True)
     for k in 'user', 'system', 'idle', 'iowait':
         try:
-            data['times'][k] = getattr(ct, k)
+            data['times'][k] = value(getattr(ct, k), unit='seconds', counter=True)
         except AttributeError:
             pass
     return data
@@ -172,26 +189,20 @@ def gather_volumes():
     volumes = OrderedDict()
     for p in psutil.disk_partitions():
         usage = psutil.disk_usage(p.mountpoint)
+
+        usage_free_state = 'red' if usage.total >= free_bytes_red_threshold * 4 and usage.free < free_bytes_red_threshold else 'green'
+        usage_percent_state = 'red' if usage.percent >= percent_red_threshold else 'green'
+
         v_data = OrderedDict()
         v_data['mountpoint'] = p.mountpoint
         v_data['device'] = p.device
         v_data['fstype'] = p.fstype
         v_data['opts'] = p.opts
         v_data['usage'] = OrderedDict()
-        v_data['usage']['total_bytes'] = usage.total
-        v_data['usage']['used_bytes'] = usage.used
-        v_data['usage']['free_bytes'] = {
-            '__value': usage.free,
-            '__check': {
-                'state': 'red' if usage.total >= free_bytes_red_threshold * 4 and usage.free < free_bytes_red_threshold else 'green',
-            },
-        }
-        v_data['usage']['percent'] = {
-            '__value': usage.percent,
-            '__check': {
-                'state': 'red' if usage.percent >= percent_red_threshold else 'green',
-            },
-        }
+        v_data['usage']['total_bytes'] = value(usage.total, unit='bytes')
+        v_data['usage']['used_bytes'] = value(usage.used, unit='bytes')
+        v_data['usage']['free_bytes'] = value(usage.free, unit='bytes', check_state=usage_free_state)
+        v_data['usage']['percent'] = value(usage.percent, unit='percents', check_state=usage_percent_state)
         volumes[p.mountpoint] = v_data
     return volumes
 
@@ -199,21 +210,16 @@ def gather_volumes():
 def gather_memory():
     mem = psutil.virtual_memory()
     data = OrderedDict()
-    data['total_bytes'] = mem.total
-    data['available_bytes'] = mem.available
+    data['total_bytes'] = value(mem.total, unit='bytes')
+    data['available_bytes'] = value(mem.available, unit='bytes')
     return data
 
 
 def gather_swap():
     sw = psutil.swap_memory()
     data = OrderedDict()
-    data['total_bytes'] = sw.total
-    data['used_bytes'] = sw.used
-    data['free_bytes'] = sw.free
-    data['percent'] = {
-        '__value': sw.percent,
-        '__check': {
-            'state': 'red' if sw.percent > 80 else 'green',
-        },
-    }
+    data['total_bytes'] = value(sw.total, unit='bytes')
+    data['used_bytes'] = value(sw.used, unit='bytes')
+    data['free_bytes'] = value(sw.free, unit='bytes')
+    data['percent'] = value(sw.percent, check_state='red' if sw.percent > 80 else 'green')
     return data
