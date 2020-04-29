@@ -1,4 +1,5 @@
 import argparse
+from collections import OrderedDict
 from datetime import datetime
 from datetime import timedelta
 import logging
@@ -53,10 +54,9 @@ def run_system_agent(conf):
 
 def run_system_agent_iteration(conf, sleep_interval):
     report_date = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-    report_label = {
-        'agent': 'system',
-        'host': getfqdn(),
-    }
+    report_label = OrderedDict()
+    report_label['agent'] = 'system'
+    report_label['host'] = getfqdn()
     t0 = monotime()
     report_state = gather_state(conf)
     duration = monotime() - t0
@@ -90,16 +90,16 @@ def run_system_agent_iteration(conf, sleep_interval):
 
 
 def gather_state(conf):
-    return {
-        'cpu': gather_cpu(),
-        'load': gather_load(),
-        'uptime': gather_uptime(),
-        'volumes': gather_volumes(),
-        'memory': gather_memory(),
-        'swap': gather_swap(),
-        'outward_ip4': gather_outward_ip4(),
-        'outward_ip6': gather_outward_ip6(),
-    }
+    state = OrderedDict()
+    state['cpu'] = gather_cpu()
+    state['load'] = gather_load()
+    state['uptime'] = gather_uptime()
+    state['volumes'] = gather_volumes()
+    state['memory'] = gather_memory()
+    state['swap'] = gather_swap()
+    state['outward_ip4'] = gather_outward_ip4()
+    state['outward_ip6'] = gather_outward_ip6()
+    return state
 
 
 def gather_outward_ip4():
@@ -124,11 +124,10 @@ def gather_outward_ip6():
 
 
 def gather_load():
-    data = {
-        '01m': round(os.getloadavg()[0], 2),
-        '05m': round(os.getloadavg()[1], 2),
-        '15m': round(os.getloadavg()[2], 2)
-    }
+    data = OrderedDict()
+    data['01m'] = round(os.getloadavg()[0], 2)
+    data['05m'] = round(os.getloadavg()[1], 2)
+    data['15m'] = round(os.getloadavg()[2], 2)
     return data
 
 
@@ -140,29 +139,25 @@ def gather_uptime():
     except FileNotFoundError as e:
         logger.debug('Cannot determine uptime: %s', e)
         return None
-    data = {
-        'seconds': round(uptime_seconds, 0),
-        'string': uptime_string
-    }
+    data = OrderedDict()
+    data['seconds'] = round(uptime_seconds, 0)
+    data['string'] = uptime_string
     return data
 
 
 def gather_cpu():
     ct = psutil.cpu_times()
     cs = psutil.cpu_stats()
-    data = {
-        'count': {
-            'logical': psutil.cpu_count(logical=True),
-            'physical': psutil.cpu_count(logical=False),
-        },
-        'times': {},
-        'stats': {
-            'ctx_switches': cs.ctx_switches,
-            'interrupts': cs.interrupts,
-            'soft_interrupts': cs.soft_interrupts,
-            'syscalls': cs.syscalls,
-        },
-    }
+    data = OrderedDict()
+    data['count'] = OrderedDict()
+    data['count']['logical'] = psutil.cpu_count(logical=True)
+    data['count']['physical'] = psutil.cpu_count(logical=False)
+    data['times'] = OrderedDict()
+    data['stats'] = OrderedDict()
+    data['stats']['ctx_switches'] = cs.ctx_switches
+    data['stats']['interrupts'] = cs.interrupts
+    data['stats']['soft_interrupts'] = cs.soft_interrupts
+    data['stats']['syscalls'] = cs.syscalls
     for k in 'user', 'system', 'idle', 'iowait':
         try:
             data['times'][k] = getattr(ct, k)
@@ -174,52 +169,51 @@ def gather_cpu():
 def gather_volumes():
     percent_red_threshold = 92
     free_bytes_red_threshold = 2 * 2**30 # 2 GB
-    volumes = {}
+    volumes = OrderedDict()
     for p in psutil.disk_partitions():
         usage = psutil.disk_usage(p.mountpoint)
-        volumes[p.mountpoint] = {
-            'mountpoint': p.mountpoint,
-            'device': p.device,
-            'fstype': p.fstype,
-            'opts': p.opts,
-            'usage': {
-                'total_bytes': usage.total,
-                'used_bytes': usage.used,
-                'free_bytes': {
-                    '__value': usage.free,
-                    '__check': {
-                        'state': 'red' if usage.total >= free_bytes_red_threshold * 4 and usage.free < free_bytes_red_threshold else 'green',
-                    },
-                },
-                'percent': {
-                    '__value': usage.percent,
-                    '__check': {
-                        'state': 'red' if usage.percent >= percent_red_threshold else 'green',
-                    },
-                }
+        v_data = OrderedDict()
+        v_data['mountpoint'] = p.mountpoint
+        v_data['device'] = p.device
+        v_data['fstype'] = p.fstype
+        v_data['opts'] = p.opts
+        v_data['usage'] = OrderedDict()
+        v_data['usage']['total_bytes'] = usage.total
+        v_data['usage']['used_bytes'] = usage.used
+        v_data['usage']['free_bytes'] = {
+            '__value': usage.free,
+            '__check': {
+                'state': 'red' if usage.total >= free_bytes_red_threshold * 4 and usage.free < free_bytes_red_threshold else 'green',
             },
         }
+        v_data['usage']['percent'] = {
+            '__value': usage.percent,
+            '__check': {
+                'state': 'red' if usage.percent >= percent_red_threshold else 'green',
+            },
+        }
+        volumes[p.mountpoint] = v_data
     return volumes
 
 
 def gather_memory():
     mem = psutil.virtual_memory()
-    return {
-        'total_bytes': mem.total,
-        'available_bytes': mem.available,
-    }
+    data = OrderedDict()
+    data['total_bytes'] = mem.total
+    data['available_bytes'] = mem.available
+    return data
 
 
 def gather_swap():
     sw = psutil.swap_memory()
-    return {
-        'total_bytes': sw.total,
-        'used_bytes': sw.used,
-        'free_bytes': sw.free,
-        'percent': {
-            '__value': sw.percent,
-            '__check': {
-                'state': 'red' if sw.percent > 80 else 'green',
-            },
+    data = OrderedDict()
+    data['total_bytes'] = sw.total
+    data['used_bytes'] = sw.used
+    data['free_bytes'] = sw.free
+    data['percent'] = {
+        '__value': sw.percent,
+        '__check': {
+            'state': 'red' if sw.percent > 80 else 'green',
         },
     }
+    return data
