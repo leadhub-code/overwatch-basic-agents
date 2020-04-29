@@ -1,7 +1,7 @@
 import logging
 
 
-log_format = '%(asctime)s %(name)-30s %(levelname)5s: %(message)s'
+log_format = '%(asctime)s [%(process)d] %(name)-30s %(levelname)5s: %(message)s'
 
 
 def setup_logging(verbosity=0):
